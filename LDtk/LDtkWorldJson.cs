@@ -8,7 +8,7 @@ using Point = Microsoft.Xna.Framework.Point;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
 using Vector2 = Microsoft.Xna.Framework.Vector2;
 
-#pragma warning disable 1591, 1570, IDE1006
+#pragma warning disable 1591, 1570, IDE1006, CS8618
 namespace LDtk;
 
 /// <summary>
@@ -73,15 +73,17 @@ public partial class LDtkWorld
     public WorldLayout WorldLayout { get; set; }
 
 
-    public static readonly JsonSerializerOptions SerializeOptions = new JsonSerializerOptions()
+    public static readonly JsonSerializerOptions SerializeOptions = new()
     {
         Converters ={
+            new NeighborDirConverter(),
                 new JsonStringEnumConverter(),
                 new ColorConverter(),
                 new RectConverter(),
                 new Vector2Converter(),
                 new PointConverter(),
-            }
+            },
+        
     };
 }
 
@@ -123,12 +125,6 @@ public partial class Definitions
     public LayerDefinition[] Layers { get; set; }
 
     /// <summary>
-    /// An array containing all custom fields available to all levels.
-    /// </summary>
-    [JsonPropertyName("levelFields")]
-    public FieldDefinition[] LevelFields { get; set; }
-
-    /// <summary>
     /// All tilesets
     /// </summary>
     [JsonPropertyName("tilesets")]
@@ -142,12 +138,6 @@ public partial class EntityDefinition
     /// </summary>
     [JsonPropertyName("color")]
     public Color Color { get; set; }
-
-    /// <summary>
-    /// Array of field definitions
-    /// </summary>
-    [JsonPropertyName("fieldDefs")]
-    public FieldDefinition[] FieldDefs { get; set; }
 
     /// <summary>
     /// Pixel height
@@ -462,13 +452,7 @@ public partial class FieldInstance
     /// (Integer, Boolean, String etc.)<br/>  It can also be an `Array` of those same types.
     /// </summary>
     [JsonPropertyName("__value")]
-    public object _Value { get; set; }
-
-    /// <summary>
-    /// Editor internal raw values
-    /// </summary>
-    [JsonPropertyName("realEditorValues")]
-    public object[] RealEditorValues { get; set; }
+    public JsonElement _Value { get; set; }
 }
 
 public partial class LayerInstance
@@ -480,7 +464,7 @@ public partial class LayerInstance
     /// all tiles behind opaque ones will be discarded.
     /// </summary>
     [JsonPropertyName("autoLayerTiles")]
-    public TileInstance[] AutoLayerTiles { get; set; }
+    public TileInstance[]? AutoLayerTiles { get; set; }
 
     /// <summary>
     /// Grid-based height
@@ -495,7 +479,7 @@ public partial class LayerInstance
     public int _CWid { get; set; }
 
     [JsonPropertyName("entityInstances")]
-    public EntityInstance[] EntityInstances { get; set; }
+    public EntityInstance[]? EntityInstances { get; set; }
 
     /// <summary>
     /// Grid size
@@ -504,7 +488,7 @@ public partial class LayerInstance
     public int _GridSize { get; set; }
 
     [JsonPropertyName("gridTiles")]
-    public TileInstance[] GridTiles { get; set; }
+    public TileInstance[]? GridTiles { get; set; }
 
     /// <summary>
     /// Layer definition identifier
@@ -518,7 +502,7 @@ public partial class LayerInstance
     /// and IntGrid values start at 1. This array size is `__cWid` x `__cHei` cells.
     /// </summary>
     [JsonPropertyName("intGridCsv")]
-    public int[] IntGridCsv { get; set; }
+    public int[]? IntGridCsv { get; set; }
 
     /// <summary>
     /// Reference the Layer definition UID
@@ -580,7 +564,7 @@ public partial class LayerInstance
     /// The relative path to corresponding Tileset, if any.
     /// </summary>
     [JsonPropertyName("__tilesetRelPath")]
-    public string _TilesetRelPath { get; set; }
+    public string? _TilesetRelPath { get; set; }
 
     /// <summary>
     /// Layer type (possible values: IntGrid, Entities, Tiles or AutoLayer)
@@ -679,7 +663,7 @@ public partial class EntityInstance
     /// some tile provided by a field value, like an Enum).
     /// </summary>
     [JsonPropertyName("__tile")]
-    public EntityInstanceTile _Tile { get; set; }
+    public EntityInstanceTile? _Tile { get; set; }
 
     /// <summary>
     /// Entity width in pixels. For non-resizable entities, it will be the same as Entity
@@ -709,24 +693,6 @@ public partial class EntityInstanceTile
 }
 
 /// <summary>
-/// IntGrid value instance
-/// </summary>
-public partial class IntGridValueInstance
-{
-    /// <summary>
-    /// Coordinate ID in the layer grid
-    /// </summary>
-    [JsonPropertyName("coordId")]
-    public int CoordId { get; set; }
-
-    /// <summary>
-    /// IntGrid value
-    /// </summary>
-    [JsonPropertyName("v")]
-    public int V { get; set; }
-}
-
-/// <summary>
 /// Nearby level info
 /// </summary>
 public partial class NeighbourLevel
@@ -736,128 +702,16 @@ public partial class NeighbourLevel
     /// `e`ast).
     /// </summary>
     [JsonPropertyName("dir")]
-    public string Dir { get; set; }
+    public NeighborDir Dir { get; set; }
 
     [JsonPropertyName("levelUid")]
     public int LevelUid { get; set; }
 }
 
-/// <summary>
-/// This section is mostly only intended for the LDtk editor app itself. You can safely
-/// ignore it.
-/// </summary>
-public partial class FieldDefinition
+public enum NeighborDir
 {
-    /// <summary>
-    /// Human readable value type (eg. `Int`, `Float`, `Point`, etc.). If the field is an array,
-    /// this field will look like `Array<...>` (eg. `Array<Int>`, `Array<Point>` etc.)
-    /// </summary>
-    [JsonPropertyName("__type")]
-    public string Type { get; set; }
-
-    /// <summary>
-    /// Optional list of accepted file extensions for FilePath value type. Includes the dot:
-    /// `.ext`
-    /// </summary>
-    [JsonPropertyName("acceptFileTypes")]
-    public string[] AcceptFileTypes { get; set; }
-
-    /// <summary>
-    /// Array max length
-    /// </summary>
-    [JsonPropertyName("arrayMaxLength")]
-    public long? ArrayMaxLength { get; set; }
-
-    /// <summary>
-    /// Array min length
-    /// </summary>
-    [JsonPropertyName("arrayMinLength")]
-    public long? ArrayMinLength { get; set; }
-
-    /// <summary>
-    /// TRUE if the value can be null. For arrays, TRUE means it can contain null values
-    /// (exception: array of Points can't have null values).
-    /// </summary>
-    [JsonPropertyName("canBeNull")]
-    public bool CanBeNull { get; set; }
-
-    /// <summary>
-    /// Default value if selected value is null or invalid.
-    /// </summary>
-    [JsonPropertyName("defaultOverride")]
-    public object DefaultOverride { get; set; }
-
-    [JsonPropertyName("editorAlwaysShow")]
-    public bool EditorAlwaysShow { get; set; }
-
-    [JsonPropertyName("editorCutLongValues")]
-    public bool EditorCutLongValues { get; set; }
-
-    /// <summary>
-    /// Possible values: `Hidden`, `ValueOnly`, `NameAndValue`, `EntityTile`, `Points`,
-    /// `PointStar`, `PointPath`, `PointPathLoop`, `RadiusPx`, `RadiusGrid`
-    /// </summary>
-    [JsonPropertyName("editorDisplayMode")]
-    public EditorDisplayMode EditorDisplayMode { get; set; }
-
-    /// <summary>
-    /// Possible values: `Above`, `Center`, `Beneath`
-    /// </summary>
-    [JsonPropertyName("editorDisplayPos")]
-    public EditorDisplayPos EditorDisplayPos { get; set; }
-
-    /// <summary>
-    /// Unique String identifier
-    /// </summary>
-    [JsonPropertyName("identifier")]
-    public string Identifier { get; set; }
-
-    /// <summary>
-    /// TRUE if the value is an array of multiple values
-    /// </summary>
-    [JsonPropertyName("isArray")]
-    public bool IsArray { get; set; }
-
-    /// <summary>
-    /// Max limit for value, if applicable
-    /// </summary>
-    [JsonPropertyName("max")]
-    public double? Max { get; set; }
-
-    /// <summary>
-    /// Min limit for value, if applicable
-    /// </summary>
-    [JsonPropertyName("min")]
-    public double? Min { get; set; }
-
-    /// <summary>
-    /// Optional regular expression that needs to be matched to accept values. Expected format:
-    /// `/some_reg_ex/g`, with optional "i" flag.
-    /// </summary>
-    [JsonPropertyName("regex")]
-    public string Regex { get; set; }
-
-    /// <summary>
-    /// Possible values: &lt;`null`&gt;, `LangPython`, `LangRuby`, `LangJS`, `LangLua`, `LangC`,
-    /// `LangHaxe`, `LangMarkdown`, `LangJson`, `LangXml`
-    /// </summary>
-    [JsonPropertyName("textLanguageMode")]
-    public TextLanguageMode? TextLanguageMode { get; set; }
-
-    /// <summary>
-    /// Internal type enum
-    /// </summary>
-    [JsonPropertyName("type")]
-    public object FieldDefinitionType { get; set; }
-
-    /// <summary>
-    /// Unique Int identifier
-    /// </summary>
-    [JsonPropertyName("uid")]
-    public long Uid { get; set; }
+    North, South, East, West
 }
-
-public enum BgPos { Contain, Cover, CoverDirty, Unscaled };
 
 /// <summary>
 /// An enum that describes how levels are organized in this project (ie. linearly or in a 2D
@@ -871,16 +725,4 @@ public enum WorldLayout { Free, GridVania, LinearHorizontal, LinearVertical };
 /// </summary>
 public enum LayerType { IntGrid, Entities, Tiles, AutoLayer };
 
-/// <summary>
-/// Possible values: `Hidden`, `ValueOnly`, `NameAndValue`, `EntityTile`, `Points`,
-/// `PointStar`, `PointPath`, `PointPathLoop`, `RadiusPx`, `RadiusGrid`
-/// </summary>
-public enum EditorDisplayMode { EntityTile, Hidden, NameAndValue, PointPath, PointPathLoop, PointStar, Points, RadiusGrid, RadiusPx, ValueOnly };
-
-/// <summary>
-/// Possible values: `Above`, `Center`, `Beneath`
-/// </summary>
-public enum EditorDisplayPos { Above, Beneath, Center };
-
-public enum TextLanguageMode { LangC, LangHaxe, LangJs, LangJson, LangLua, LangMarkdown, LangPython, LangRuby, LangXml };
-#pragma warning restore 1591, 1570, IDE1006
+#pragma warning restore 1591, 1570, IDE1006, CS8618

@@ -4,7 +4,11 @@ using System.Collections.Generic;
 namespace LDtk.Codegen.CompilationUnits;
 public class EnumCompilationUnit : CompilationUnitFragment
 {
-    public List<string> Literals { get; set; } = new List<string>();
+    public EnumCompilationUnit(string name, List<string> literals) : base(name) {
+        Literals = literals;
+    }
+
+    public List<string> Literals { get; }
 
     public override void Render(CompilationUnitSource source)
     {

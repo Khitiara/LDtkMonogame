@@ -1,12 +1,18 @@
 
 using System.Collections.Generic;
+using System.Linq;
 
 namespace LDtk.Codegen.CompilationUnits;
 
 public class CompilationUnit : CompilationUnitFragment
 {
-    public string ClassNamespace { get; set; }
-    public List<CompilationUnitFragment> Fragments { get; set; } = new List<CompilationUnitFragment>();
+    public CompilationUnit(string name, string? classNamespace, IEnumerable<CompilationUnitFragment> fragments) : base(name) {
+        ClassNamespace = classNamespace;
+        Fragments = fragments;
+    }
+
+    public string? ClassNamespace { get; set; }
+    public IEnumerable<CompilationUnitFragment> Fragments { get; set; }
 
     public override void Render(CompilationUnitSource source)
     {

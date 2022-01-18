@@ -28,7 +28,14 @@ public class LDtkIntGrid
     /// <value>Pixels</value>
     public Point WorldPosition { get; set; }
 
-    internal Dictionary<int, Color> colors = new Dictionary<int, Color>();
+    internal readonly Dictionary<int, Color> colors;
+
+    internal LDtkIntGrid(int[,] values, Point worldPosition, int tileSize, Dictionary<int, Color> colors) {
+        Values = values;
+        WorldPosition = worldPosition;
+        TileSize = tileSize;
+        this.colors = colors;
+    }
 
     /// <summary>
     /// Gets the int value at location and return 0 if out of bounds
@@ -50,8 +57,9 @@ public class LDtkIntGrid
     /// <returns>Grid position</returns>
     public Point FromWorldToGridSpace(Vector2 position)
     {
-        int x = (int)Math.Floor(position.X / TileSize);
-        int y = (int)Math.Floor(position.Y / TileSize);
+        (float xf, float yf) = position;
+        int x = (int)Math.Floor(xf / TileSize);
+        int y = (int)Math.Floor(yf / TileSize);
         return new Point(x, y);
     }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json;
 using Microsoft.Xna.Framework.Content.Pipeline;
 
 namespace LDtk.ContentPipeline.World;
@@ -8,14 +9,9 @@ public class LDtkWorldProcessor : ContentProcessor<string, LDtkWorld>
 {
     public override LDtkWorld Process(string input, ContentProcessorContext context)
     {
-        LDtkWorld world;
-
         try
         {
-            ContentLogger.Logger = context.Logger;
-            ContentLogger.LogMessage($"Processing");
-
-            world = System.Text.Json.JsonSerializer.Deserialize<LDtkWorld>(input, LDtkWorld.SerializeOptions);
+            return JsonSerializer.Deserialize<LDtkWorld>(input, LDtkWorld.SerializeOptions);
         }
         catch (Exception ex)
         {
@@ -23,6 +19,5 @@ public class LDtkWorldProcessor : ContentProcessor<string, LDtkWorld>
             throw;
         }
 
-        return world;
     }
 }

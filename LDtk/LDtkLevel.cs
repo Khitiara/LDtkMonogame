@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json.Serialization;
 using LDtk.Exceptions;
 using Microsoft.Xna.Framework;
@@ -11,7 +12,8 @@ public partial class LDtkLevel
     /// <summary>
     /// The parent world of this level
     /// </summary>
-    public LDtkWorld Parent { get; set; }
+    [JsonIgnore]
+    public LDtkWorld Parent { get; set; } = null!;
 
     /// <summary>
     /// World Position of the level in pixels
@@ -34,52 +36,28 @@ public partial class LDtkLevel
     public LDtkIntGrid GetIntGrid(string identifier)
     {
         // Render Tile, Auto and Int grid layers
-        for (int i = 0; i < LayerInstances.Length; i++)
+        LayerInstance layer =
+            LayerInstances?.FirstOrDefault(l => l._Identifier == identifier && l._Type == LayerType.IntGrid) ??
+            throw new IntGridNotFoundException($"{identifier} not found.");
+
+        IntGridValueDefinition[] intgridValues = Parent.GetIntgridValueDefinitions(layer._Identifier);
+        Dictionary<int, Color> colors = intgridValues.ToDictionary(t => t.Value, t => t.Color);
+
+        LDtkIntGrid intGrid = new(new int[layer._CWid, layer._CHei], Position, layer._GridSize, colors);
+
+        if (layer.IntGridCsv == null)
         {
-            LayerInstance layer = LayerInstances[i];
-            if (layer._Identifier != identifier)
-            {
-                continue;
-            }
-
-            if (layer._Type != LayerType.IntGrid)
-            {
-                continue;
-            }
-
-            IntGridValueDefinition[] intgridValues = Parent.GetIntgridValueDefinitions(layer._Identifier);
-            Dictionary<int, Color> colors = new Dictionary<int, Color>();
-            for (int j = 0; j < intgridValues.Length; j++)
-            {
-                colors.Add(intgridValues[j].Value, intgridValues[j].Color);
-            }
-
-            LDtkIntGrid intGrid = new()
-            {
-                Values = new int[layer._CWid, layer._CHei],
-                WorldPosition = Position,
-                TileSize = layer._GridSize,
-                colors = colors,
-            };
-
-            if (layer.IntGridCsv != null)
-            {
-                for (int j = 0; j < layer.IntGridCsv.Length; j++)
-                {
-                    int y = j / layer._CWid;
-                    int x = j - (y * layer._CWid);
-                    intGrid.Values[x, y] = layer.IntGridCsv[j];
-                }
-            }
-            else
-            {
-                throw new IntGridNotFoundException($"{identifier} not found.");
-            }
-
-            return intGrid;
+            throw new IntGridNotFoundException($"{identifier} not found.");
         }
 
-        throw new IntGridNotFoundException($"{identifier} not found.");
+        for (int j = 0; j < layer.IntGridCsv.Length; j++)
+        {
+            int y = j / layer._CWid;
+            int x = j - (y * layer._CWid);
+            intGrid.Values[x, y] = layer.IntGridCsv[j];
+        }
+
+        return intGrid;
     }
 
     /// <summary>
@@ -87,36 +65,27 @@ public partial class LDtkLevel
     /// </summary>
     /// <returns></returns>
     /// <exception cref="EntityNotFoundException"></exception>
-    public T GetEntity<T>() where T : new()
-    {
-        T[] entities = ParseEntities<T>(typeof(T).Name);
-
-        if (entities.Length != 0)
-        {
-            return entities[0];
-        }
-        else
-        {
-            throw new EntityNotFoundException($"Could not find entity with identifier {typeof(T).Name}");
-        }
-    }
+    public T GetEntity<T>()
+        where T : new() =>
+        ParseEntities<T>(typeof(T).Name).FirstOrDefault() ??
+        throw new EntityNotFoundException($"Could not find entity with identifier {typeof(T).Name}");
 
     /// <summary>
     /// Gets a collection of entities of type <typeparamref name="T"/> in the current level
     /// </summary>
     /// <returns></returns>
     /// <exception cref="EntityNotFoundException"></exception>
-    public T[] GetEntities<T>() where T : new()
-    {
-        return ParseEntities<T>(typeof(T).Name);
-    }
+    public IEnumerable<T> GetEntities<T>()
+        where T : new() =>
+        ParseEntities<T>(typeof(T).Name);
 
     /// <summary>
     /// Gets a collection of entities of type <typeparamref name="T"/> with <paramref name="identifier"/> in the current level
     /// </summary>
     /// <returns></returns>
     /// <exception cref="EntityNotFoundException"></exception>
-    public T[] GetEntities<T>(string identifier) where T : new()
+    public IEnumerable<T> GetEntities<T>(string identifier)
+        where T : new()
     {
         return ParseEntities<T>(identifier);
     }
@@ -127,9 +96,10 @@ public partial class LDtkLevel
     /// <typeparam name="T">The custom level type generated from compiling the level</typeparam>
     /// <exception cref="FieldNotFoundException"></exception>
     /// <returns>Custom Fields for this level</returns>
-    public T GetCustomFields<T>() where T : new()
+    public T GetCustomFields<T>()
+        where T : new()
     {
-        T levelFields = new T();
+        T levelFields = new();
 
         LDtkFieldParser.ParseCustomLevelFields(levelFields, FieldInstances);
 
@@ -142,11 +112,12 @@ public partial class LDtkLevel
     /// <returns>True if point is inside level</returns>
     public bool Contains(Point point)
     {
+        (int x, int y) = point;
         return
-            point.X >= Position.X &&
-            point.Y >= Position.Y &&
-            point.X <= Position.X + Size.X &&
-            point.Y <= Position.Y + Size.Y;
+            x >= Position.X &&
+            y >= Position.Y &&
+            x <= Position.X + Size.X &&
+            y <= Position.Y + Size.Y;
     }
 
     /// <summary>
@@ -155,39 +126,23 @@ public partial class LDtkLevel
     /// <returns>True if point is inside level</returns>
     public bool Contains(Vector2 point)
     {
+        (float x, float y) = point;
         return
-            point.X >= Position.X &&
-            point.Y >= Position.Y &&
-            point.X <= Position.X + Size.X &&
-            point.Y <= Position.Y + Size.Y;
+            x >= Position.X &&
+            y >= Position.Y &&
+            x <= Position.X + Size.X &&
+            y <= Position.Y + Size.Y;
     }
 
-    private T[] ParseEntities<T>(string identifier) where T : new()
-    {
-        List<T> parsedEntities = new List<T>();
-
-        for (int i = 0; i < LayerInstances.Length; i++)
-        {
-            if (LayerInstances[i]._Type == LayerType.Entities)
+    private IEnumerable<T> ParseEntities<T>(string identifier)
+        where T : new() =>
+        LayerInstances?.FirstOrDefault(l => l._Type == LayerType.Entities)?.EntityInstances
+            ?.Where(i => i._Identifier == identifier)
+            .Select(i =>
             {
-                for (int entityIndex = 0; entityIndex < LayerInstances[i].EntityInstances.Length; entityIndex++)
-                {
-                    if (LayerInstances[i].EntityInstances[entityIndex]._Identifier == identifier)
-                    {
-                        T entity = new T();
-                        EntityInstance entityInstance = LayerInstances[i].EntityInstances[entityIndex];
-
-                        LDtkFieldParser.ParseBaseEntityFields(entity, entityInstance, this);
-                        LDtkFieldParser.ParseCustomEntityFields(entity, entityInstance.FieldInstances, this);
-
-                        parsedEntities.Add(entity);
-                    }
-                }
-
-                return parsedEntities.ToArray();
-            }
-        }
-
-        return parsedEntities.ToArray();
-    }
+                T e = new();
+                LDtkFieldParser.ParseBaseEntityFields(e, i, this);
+                LDtkFieldParser.ParseCustomEntityFields(e, i.FieldInstances, this);
+                return e;
+            }) ?? Enumerable.Empty<T>();
 }

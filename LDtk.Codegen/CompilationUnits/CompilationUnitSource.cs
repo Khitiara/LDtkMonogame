@@ -20,7 +20,7 @@ public class CompilationUnitSource
         imports = new SortedSet<string>();
     }
 
-    public void Using(string package)
+    public void Using(string? package)
     {
         if (package == null)
         {
@@ -55,7 +55,7 @@ public class CompilationUnitSource
 
     public string GetSourceCode()
     {
-        StringBuilder code = new StringBuilder();
+        StringBuilder code = new();
 
         if (cs.GeneratedFileHeader != null)
         {
@@ -66,7 +66,7 @@ public class CompilationUnitSource
 
         foreach (string use in imports)
         {
-            code.AppendLine(CultureInfo.InvariantCulture, $"using {use};");
+            code.AppendLine(string.Format(CultureInfo.InvariantCulture, "using {0};", use));
         }
 
         code.AppendLine();

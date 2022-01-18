@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using LDtk.Exceptions;
@@ -21,12 +22,13 @@ public partial class LDtkWorld
     /// The absolute folder that the world is located in.
     /// Used to absolute relative addresses of textures
     /// </summary>
-    public string RootFolder { get; set; }
+    [JsonIgnore]
+    public string RootFolder { get; set; } = null!;
 
     /// <summary>
     /// The content manager used if you are using the contentpipeline
     /// </summary>
-    public ContentManager Content { get; set; }
+    public ContentManager? Content { get; set; }
 
     /// <summary>
     /// Loads the ldtk world file from disk directly
@@ -35,9 +37,9 @@ public partial class LDtkWorld
     /// <returns>LDtkWorld</returns>
     public static LDtkWorld LoadWorld(string filePath)
     {
-        LDtkWorld world = JsonSerializer.Deserialize<LDtkWorld>(File.ReadAllText(filePath), SerializeOptions);
+        LDtkWorld world = JsonSerializer.Deserialize<LDtkWorld>(File.ReadAllText(filePath), SerializeOptions)!;
 
-        world.RootFolder = Path.GetFullPath(Path.GetDirectoryName(filePath));
+        world.RootFolder = Path.GetFullPath(Path.GetDirectoryName(filePath) ?? string.Empty);
         return world;
     }
 
@@ -49,10 +51,9 @@ public partial class LDtkWorld
     /// <returns>LDtkWorld</returns>
     public static LDtkWorld LoadWorld(string filePath, ContentManager content)
     {
-        LDtkWorld world;
-        world = content.Load<LDtkWorld>(filePath);
+        LDtkWorld world = content.Load<LDtkWorld>(filePath);
         world.Content = content;
-        world.RootFolder = Path.GetDirectoryName(filePath);
+        world.RootFolder = Path.GetDirectoryName(filePath) ?? string.Empty;
 
         return world;
     }
@@ -65,34 +66,19 @@ public partial class LDtkWorld
     /// <exception cref="LevelNotFoundException"></exception>
     public LDtkLevel LoadLevel(string identifier)
     {
-        LDtkLevel level = null;
+        LDtkLevel level = Levels.FirstOrDefault(l => l.Identifier == identifier) ??
+                          throw new LevelNotFoundException($"Could not find {identifier} Level in {this}.");
 
-        for (int i = 0; i < Levels.Length; i++)
+        if (ExternalLevels)
         {
-            if (Levels[i].Identifier != identifier)
-            {
-                continue;
-            }
+            string path = Path.Join(RootFolder, level.ExternalRelPath);
 
-            if (ExternalLevels == false)
-            {
-                level = Levels[i];
-                break;
-            }
-
-            string path = Path.Join(RootFolder, Levels[i].ExternalRelPath);
-
-            level = Content.Load<LDtkLevel>(path.Replace(".ldtkl", "")) ?? JsonSerializer.Deserialize<LDtkLevel>(File.ReadAllText(path), SerializeOptions);
-            break;
+            level = Content?.Load<LDtkLevel>(path.Replace(".ldtkl", "")) ??
+                    JsonSerializer.Deserialize<LDtkLevel>(File.ReadAllText(path), SerializeOptions)!;
         }
 
-        if (level != null)
-        {
-            level.Parent = this;
-            return level;
-        }
-
-        throw new LevelNotFoundException($"Could not find {identifier} Level in {this}.");
+        level.Parent = this;
+        return level;
     }
 
     /// <summary>
@@ -103,34 +89,19 @@ public partial class LDtkWorld
     /// <exception cref="LevelNotFoundException"></exception>
     public LDtkLevel LoadLevel(int uid)
     {
-        LDtkLevel level = null;
+        LDtkLevel level = Levels.FirstOrDefault(l => l.Uid == uid) ??
+                          throw new LevelNotFoundException($"Could not find {uid} Level in {this}.");
 
-        for (int i = 0; i < Levels.Length; i++)
+        if (ExternalLevels)
         {
-            if (Levels[i].Uid != uid)
-            {
-                continue;
-            }
+            string path = Path.Join(RootFolder, level.ExternalRelPath);
 
-            if (ExternalLevels == false)
-            {
-                level = Levels[i];
-                break;
-            }
-
-            string path = Path.Join(RootFolder, Levels[i].ExternalRelPath);
-
-            level = Content.Load<LDtkLevel>(path.Replace(".ldtkl", "")) ?? JsonSerializer.Deserialize<LDtkLevel>(File.ReadAllText(path), SerializeOptions);
-            break;
+            level = Content?.Load<LDtkLevel>(path.Replace(".ldtkl", "")) ??
+                    JsonSerializer.Deserialize<LDtkLevel>(File.ReadAllText(path), SerializeOptions)!;
         }
 
-        if (level != null)
-        {
-            level.Parent = this;
-            return level;
-        }
-
-        throw new LevelNotFoundException($"Could not find {uid} Level in {this}.");
+        level.Parent = this;
+        return level;
     }
 
     /// <summary>
@@ -139,18 +110,7 @@ public partial class LDtkWorld
     /// <param name="uid"></param>
     /// <returns>EntityDefinition</returns>
     /// <exception cref="NotImplementedException"></exception>
-    public EntityDefinition GetEntityDefinitionFromUid(int uid)
-    {
-        for (int i = 0; i < Defs.Entities.Length; i++)
-        {
-            if (Defs.Entities[i].Uid == uid)
-            {
-                return Defs.Entities[i];
-            }
-        }
-
-        return null;
-    }
+    public EntityDefinition? GetEntityDefinitionFromUid(int uid) => Defs.Entities.FirstOrDefault(t => t.Uid == uid);
 
     /// <summary>
     /// Gets the intgrid value definitions
@@ -158,44 +118,26 @@ public partial class LDtkWorld
     /// <param name="identifier">leyer identifier</param>
     /// <returns></returns>
     /// <exception cref="FieldNotFoundException"></exception>
-    public IntGridValueDefinition[] GetIntgridValueDefinitions(string identifier)
-    {
-        for (int i = 0; i < Defs.Layers.Length; i++)
-        {
-            if (Defs.Layers[i].Identifier != identifier)
-            {
-                continue;
-            }
-
-            if (Defs.Layers[i]._Type == LayerType.IntGrid)
-            {
-                return Defs.Layers[i].IntGridValues;
-            }
-        }
-
-        throw new FieldNotFoundException();
-    }
+    public IntGridValueDefinition[] GetIntgridValueDefinitions(string identifier) =>
+        Defs.Layers.FirstOrDefault(l => l.Identifier == identifier && l._Type == LayerType.IntGrid)
+            ?.IntGridValues ?? throw new FieldNotFoundException();
 
     /// <summary>
     /// Gets a collection of entities of type <typeparamref name="T"/> in the current level
     /// </summary>
     /// <returns></returns>
     /// <exception cref="EntityNotFoundException"></exception>
-    public T GetEntity<T>() where T : new()
-    {
-        List<T> entities = new List<T>();
-        for (int i = 0; i < Levels.Length; i++)
-        {
-            entities.AddRange(Levels[i].GetEntities<T>());
-        }
+    public T GetEntity<T>()
+        where T : new() =>
+        GetEntities<T>().FirstOrDefault() ??  throw new EntityNotFoundException($"Could not find entity with identifier {typeof(T).Name}");
 
-        if (entities.Count == 1)
-        {
-            return entities[0];
-        }
-        else
-        {
-            throw new EntityNotFoundException($"Could not find entity with identifier {typeof(T).Name}");
-        }
+    /// <summary>
+    /// Gets an entity of type <typeparamref name="T"/> in the current level
+    /// </summary>
+    /// <returns></returns>
+    /// <exception cref="EntityNotFoundException"></exception>
+    public IEnumerable<T> GetEntities<T>()
+        where T : new() {
+        return Levels.SelectMany(l => l.GetEntities<T>());
     }
 }

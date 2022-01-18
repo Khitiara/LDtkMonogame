@@ -11,25 +11,19 @@ public class CompilationUnitField : CompilationUnitFragment
         Public,
     }
 
-    public string RequiredImport { get; set; }
-    public FieldVisibility? Visibility { get; set; }
-    public string Type { get; set; }
+    public string? RequiredImport { get; }
+    public FieldVisibility? Visibility { get; }
+    public string Type { get; }
 
-    public CompilationUnitField()
+    public CompilationUnitField(string name, string type, string? requiredImport, FieldVisibility visibility) : base(name)
     {
-    }
-
-    public CompilationUnitField(string name, string type, string requiredImport, FieldVisibility visibility)
-    {
-        Name = name;
         Type = type;
         Visibility = visibility;
         RequiredImport = requiredImport;
     }
 
-    public CompilationUnitField(string name, string type)
+    public CompilationUnitField(string name, string type) : base(name)
     {
-        Name = name;
         Type = type;
         Visibility = FieldVisibility.Public;
         RequiredImport = null;

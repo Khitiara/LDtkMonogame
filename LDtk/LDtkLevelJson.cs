@@ -29,7 +29,7 @@ public partial class LDtkLevel
     /// automatically used here if its value is `null`)
     /// </summary>
     [JsonPropertyName("__bgPos")]
-    public LevelBackgroundPosition _BgPos { get; set; }
+    public LevelBackgroundPosition? _BgPos { get; set; }
     /// <summary>
     /// An array listing all other levels touching this one on the world map. In "linear" world
     /// layouts, this array is populated with previous/next levels in array, and `dir` depends on
@@ -42,14 +42,14 @@ public partial class LDtkLevel
     /// The *optional* relative path to the level background image.
     /// </summary>
     [JsonPropertyName("bgRelPath")]
-    public string BgRelPath { get; set; }
+    public string? BgRelPath { get; set; }
 
     /// <summary>
     /// This value is not null if the project option "*Save levels separately*" is enabled. In
     /// this case, this **relative** path points to the level Json file.
     /// </summary>
     [JsonPropertyName("externalRelPath")]
-    public string ExternalRelPath { get; set; }
+    public string? ExternalRelPath { get; set; }
 
     /// <summary>
     /// An array containing this level custom field values.
@@ -69,15 +69,7 @@ public partial class LDtkLevel
     /// in display order**: the 1st layer is the top-most and the last is behind.
     /// </summary>
     [JsonPropertyName("layerInstances")]
-    public LayerInstance[] LayerInstances { get; set; }
-
-    /// <summary>
-    /// An enum defining the way the background image (if any) is positioned on the level. See
-    /// `__bgPos` for resulting position info. Possible values: &lt;`null`&gt;, `Unscaled`,
-    /// `Contain`, `Cover`, `CoverDirty`
-    /// </summary>
-    [JsonPropertyName("bgPos")]
-    public BgPos? LevelBgPos { get; set; }
+    public LayerInstance[]? LayerInstances { get; set; }
 
     /// <summary>
     /// Height of the level in pixels

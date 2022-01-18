@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,6 +7,7 @@ using LDtk.Exceptions;
 using Microsoft.Xna.Framework;
 
 namespace LDtk;
+
 /// <summary>
 /// Utility for parsing ldtk json data into more typed versions
 /// </summary>
@@ -20,7 +20,8 @@ internal static class LDtkFieldParser
     /// <param name="level">Level</param>
     /// <param name="fields">LDtk fields to apply to the class</param>
     /// <exception cref="FieldNotFoundException"></exception>
-    public static void ParseCustomLevelFields<T>(T level, FieldInstance[] fields) where T : new()
+    public static void ParseCustomLevelFields<T>(T level, FieldInstance[] fields)
+        where T : new()
     {
         ParseCustomFields(level, fields, null);
     }
@@ -33,26 +34,23 @@ internal static class LDtkFieldParser
     /// <param name="fields">LDtk fields to apply to the class</param>
     /// <param name="level"></param>
     /// <exception cref="FieldNotFoundException"></exception>
-    public static void ParseCustomEntityFields<T>(T entity, FieldInstance[] fields, LDtkLevel level) where T : new()
+    public static void ParseCustomEntityFields<T>(T entity, FieldInstance[] fields, LDtkLevel? level)
+        where T : new()
     {
         ParseCustomFields(entity, fields, level);
     }
 
-    private static void ParseCustomFields<T>(T classFields, FieldInstance[] fields, LDtkLevel level)
+    private static void ParseCustomFields<T>(T classFields, FieldInstance[] fields, LDtkLevel? level)
     {
-        for (int i = 0; i < fields.Length; i++)
-        {
-            FieldInstance fieldInstance = fields[i];
+        foreach (FieldInstance fieldInstance in fields) {
             string variableName = fieldInstance._Identifier;
 
-            PropertyInfo variableDef = typeof(T).GetProperty(variableName);
-
-            if (variableDef == null)
+            if (typeof(T).GetProperty(variableName) is not { } variableDef)
             {
-                throw new FieldNotFoundException($"Error: Field \"{variableName}\" not found in {typeof(T).FullName}. Maybe you should run ldtkgen again to update the files?");
+                throw new FieldNotFoundException(
+                    $"Error: Field \"{variableName}\" not found in {typeof(T).FullName}. Maybe you should run ldtkgen again to update the files?");
             }
 
-            // Split any enums
             int enumTypeIndex = fieldInstance._Type.LastIndexOf('.');
             int arrayEndIndex = fieldInstance._Type.LastIndexOf('>');
 
@@ -73,10 +71,9 @@ internal static class LDtkFieldParser
                 case Field.FloatType:
                 case Field.StringType:
                 case Field.FilePathType:
-                    if (fieldInstance._Value != null)
-                    {
-                        variableDef.SetValue(classFields, Convert.ChangeType(fieldInstance._Value.ToString(), variableDef.PropertyType));
-                    }
+                    if (fieldInstance._Value.ValueKind != JsonValueKind.Null)
+                        variableDef.SetValue(classFields,
+                            fieldInstance._Value.Deserialize(variableDef.PropertyType));
 
                     break;
 
@@ -87,32 +84,32 @@ internal static class LDtkFieldParser
                 case Field.StringArrayType:
                 case Field.FilePathArrayType:
                 case Field.LocalEnumArrayType:
-                    object primativeArrayValues = JsonSerializer.Deserialize(fieldInstance._Value.ToString(), variableDef.PropertyType, new JsonSerializerOptions() { Converters = { new JsonStringEnumConverter() } });
-                    variableDef.SetValue(classFields, Convert.ChangeType(primativeArrayValues, variableDef.PropertyType));
+                    variableDef.SetValue(classFields,
+                        Convert.ChangeType(fieldInstance._Value.Deserialize(variableDef.PropertyType,
+                                new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } })!,
+                            variableDef.PropertyType));
                     break;
 
                 case Field.LocalEnumType:
-                    variableDef.SetValue(classFields, Enum.Parse(variableDef.PropertyType, fieldInstance._Value.ToString()));
+                    variableDef.SetValue(classFields,
+                        Enum.Parse(variableDef.PropertyType, fieldInstance._Value.GetString()!));
                     break;
 
                 case Field.ColorType:
-                    variableDef.SetValue(classFields, ParseStringToColor(fieldInstance._Value.ToString()));
+                    variableDef.SetValue(classFields,
+                        fieldInstance._Value.Deserialize<Color>(
+                            new JsonSerializerOptions { Converters = { new ColorConverter() } }));
                     break;
 
                 // Only Entities can have point fields
                 case Field.PointType:
-                    if (fieldInstance._Value != null)
+                    if (fieldInstance._Value.ValueKind != JsonValueKind.Null)
                     {
-                        if (variableDef.PropertyType == typeof(Vector2))
-                        {
-                            Vector2 vector = (Vector2)fieldInstance._Value;
-                            variableDef.SetValue(classFields, vector);
-                        }
-                        else if (variableDef.PropertyType == typeof(Point))
-                        {
-                            Point point = JsonSerializer.Deserialize<Point>(fieldInstance._Value.ToString(), new JsonSerializerOptions() { Converters = { new CxCyConverter() } });
-                            variableDef.SetValue(classFields, point);
-                        }
+                        fieldInstance._Value.Deserialize(variableDef.PropertyType,
+                            new JsonSerializerOptions
+                            {
+                                Converters = { new CxCyConverter(), new Vector2Converter() }
+                            });
                     }
                     else
                     {
@@ -129,14 +126,16 @@ internal static class LDtkFieldParser
                     break;
 
                 case Field.PointArrayType:
-                    List<Point> points = JsonSerializer.Deserialize<List<Point>>(fieldInstance._Value.ToString(), new JsonSerializerOptions() { Converters = { new CxCyConverter() } });
+                    List<Point> points =
+                        fieldInstance._Value.Deserialize<List<Point>>(
+                            new JsonSerializerOptions { Converters = { new CxCyConverter() } })!;
 
                     int gridSize = 0;
-                    for (int j = 0; j < level.LayerInstances.Length; j++)
+                    foreach (LayerInstance t in level!.LayerInstances!)
                     {
-                        if (level.LayerInstances[j]._Type == LayerType.Entities)
+                        if (t._Type == LayerType.Entities)
                         {
-                            gridSize = level.LayerInstances[j]._GridSize;
+                            gridSize = t._GridSize;
                         }
                     }
 
@@ -156,52 +155,37 @@ internal static class LDtkFieldParser
         }
     }
 
-    public static void ParseBaseEntityFields<T>(T entity, EntityInstance entityInstance, LDtkLevel level) where T : new()
+    public static void ParseBaseEntityFields<T>(T entity, EntityInstance entityInstance, LDtkLevel level)
+        where T : new()
     {
-        EntityDefinition entityDefinition = level.Parent.GetEntityDefinitionFromUid(entityInstance.DefUid);
+        EntityDefinition entityDefinition = level.Parent.GetEntityDefinitionFromUid(entityInstance.DefUid)!;
 
         ParseBaseField(entity, "Position", (entityInstance.Px + level.Position).ToVector2());
         ParseBaseField(entity, "Pivot", entityInstance._Pivot);
         ParseBaseField(entity, "Size", new Vector2(entityInstance.Width, entityInstance.Height));
         ParseBaseField(entity, "EditorVisualColor", entityDefinition.Color);
 
-        if (entityInstance._Tile != null)
+        if (entityInstance._Tile == null)
         {
-            EntityInstanceTile tileDefinition = entityInstance._Tile;
-            Rectangle rect = tileDefinition.SrcRect;
-            ParseBaseField(entity, "Tile", rect);
+            return;
         }
+
+        EntityInstanceTile tileDefinition = entityInstance._Tile;
+        Rectangle rect = tileDefinition.SrcRect;
+        ParseBaseField(entity, "Tile", rect);
     }
 
     // Helpers
-    private static Color ParseStringToColor(string hex)
-    {
-        return ParseStringToColor(hex, 255);
-    }
-
-    private static Color ParseStringToColor(string hex, int alpha)
-    {
-        if (uint.TryParse(hex.Replace("#", ""), NumberStyles.HexNumber, null, out uint color))
-        {
-            byte red = (byte)((color & 0xFF0000) >> 16);
-            byte green = (byte)((color & 0x00FF00) >> 8);
-            byte blue = (byte)(color & 0x0000FF);
-
-            return new Color(red, green, blue, alpha);
-        }
-        else
-        {
-            return new Color(0xFF00FFFF);
-        }
-    }
 
     private static void ParseBaseField<T>(T entity, string fieldName, object value)
     {
-        PropertyInfo variableDef = typeof(T).GetProperty(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        PropertyInfo? variableDef = typeof(T).GetProperty(fieldName,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
         if (variableDef == null)
         {
-            throw new FieldNotFoundException($"Error: Field \"{variableDef.Name}\" not found in {typeof(T).FullName}. Maybe you should run ldtkgen again to update the files?");
+            throw new FieldNotFoundException(
+                $"Error: Field \"{fieldName}\" not found in {typeof(T).FullName}. Maybe you should run ldtkgen again to update the files?");
         }
 
         variableDef.SetValue(entity, value);
@@ -212,23 +196,23 @@ internal static class LDtkFieldParser
     /// </summary>
     private static class Field
     {
-        public const string IntType = "Int";
-        public const string IntArrayType = "Array<Int>";
-        public const string FloatType = "Float";
-        public const string FloatArrayType = "Array<Float>";
-        public const string BoolType = "Bool";
-        public const string BoolArrayType = "Array<Bool>";
-        public const string EnumType = "Enum";
-        public const string EnumArrayType = "Array<Enum>";
-        public const string LocalEnumType = "LocalEnum";
+        public const string IntType            = "Int";
+        public const string IntArrayType       = "Array<Int>";
+        public const string FloatType          = "Float";
+        public const string FloatArrayType     = "Array<Float>";
+        public const string BoolType           = "Bool";
+        public const string BoolArrayType      = "Array<Bool>";
+        public const string EnumType           = "Enum";
+        public const string EnumArrayType      = "Array<Enum>";
+        public const string LocalEnumType      = "LocalEnum";
         public const string LocalEnumArrayType = "Array<LocalEnum>";
-        public const string StringType = "String";
-        public const string StringArrayType = "Array<String>";
-        public const string FilePathType = "FilePath";
-        public const string FilePathArrayType = "Array<FilePath>";
-        public const string ColorType = "Color";
-        public const string ColorArrayType = "Array<Color>";
-        public const string PointType = "Point";
-        public const string PointArrayType = "Array<Point>";
+        public const string StringType         = "String";
+        public const string StringArrayType    = "Array<String>";
+        public const string FilePathType       = "FilePath";
+        public const string FilePathArrayType  = "Array<FilePath>";
+        public const string ColorType          = "Color";
+        public const string ColorArrayType     = "Array<Color>";
+        public const string PointType          = "Point";
+        public const string PointArrayType     = "Array<Point>";
     }
 }

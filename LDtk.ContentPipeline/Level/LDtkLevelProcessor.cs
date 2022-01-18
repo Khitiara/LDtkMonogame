@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json;
 using Microsoft.Xna.Framework.Content.Pipeline;
 
 namespace LDtk.ContentPipeline.Level;
@@ -10,10 +11,7 @@ public class LDtkLevelProcessor : ContentProcessor<string, LDtkLevel>
     {
         try
         {
-            ContentLogger.Logger = context.Logger;
-            ContentLogger.LogMessage($"Processing");
-
-            return System.Text.Json.JsonSerializer.Deserialize<LDtkLevel>(input, LDtkWorld.SerializeOptions);
+            return JsonSerializer.Deserialize<LDtkLevel>(input, LDtkWorld.SerializeOptions);
         }
         catch (Exception ex)
         {

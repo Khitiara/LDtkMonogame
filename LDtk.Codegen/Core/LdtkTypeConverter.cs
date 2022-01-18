@@ -4,10 +4,18 @@ using System;
 using LDtk.Codegen.CompilationUnits;
 
 namespace LDtk.Codegen.Core;
+
 public class LdtkTypeConverter
 {
+    public LdtkTypeConverter() { }
+
+    public LdtkTypeConverter(bool pointAsVector2) {
+        PointAsVector2 = pointAsVector2;
+    }
+
     public bool PointAsVector2 { get; set; }
-    public virtual string GetArrayImport()
+
+    public virtual string? GetArrayImport()
     {
         return null;
     }
@@ -51,21 +59,9 @@ public class LdtkTypeConverter
         return declType;
     }
 
-    public CompilationUnitField ToCompilationUnitField(FieldDefinition fieldDefinition, LdtkGeneratorContext ctx)
-    {
-        CompilationUnitField field = new CompilationUnitField()
-        {
-            Name = fieldDefinition.Identifier,
-            Type = GetDeclaringTypeFor(fieldDefinition, ctx),
-            Visibility = CompilationUnitField.FieldVisibility.Public
-        };
-
-        if (fieldDefinition.IsArray)
-        {
-            field.RequiredImport = GetArrayImport();
-        }
-
-        return field;
-    }
+    public CompilationUnitField ToCompilationUnitField(FieldDefinition fieldDefinition, LdtkGeneratorContext ctx) =>
+        new(fieldDefinition.Identifier, GetDeclaringTypeFor(fieldDefinition, ctx),
+            fieldDefinition.IsArray ? GetArrayImport() : null,
+            CompilationUnitField.FieldVisibility.Public);
 }
 #pragma warning restore IDE0057

@@ -14,25 +14,29 @@ internal class ColorConverter : JsonConverter<Color>
 {
     public override Color Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        string str = reader.GetString();
-        if (str.StartsWith('#'))
+        if (reader.GetString() is not { } str)
         {
-            byte r = Convert.ToByte(str[1..3], 16);
-            byte g = Convert.ToByte(str[3..5], 16);
-            byte b = Convert.ToByte(str[5..7], 16);
-#pragma warning disable IDE0090
-            Color color = new Color(r, g, b, (byte)255);
-#pragma warning restore IDE0090
-            return color;
+            throw new JsonException();
         }
 
-        throw new Exception(str);
+        if (!str.StartsWith('#'))
+        {
+            throw new Exception(str);
+        }
+
+        byte r = Convert.ToByte(str[1..3], 16);
+        byte g = Convert.ToByte(str[3..5], 16);
+        byte b = Convert.ToByte(str[7..9], 16);
+#pragma warning disable IDE0090
+        Color color = new(r, g, b, (byte)255);
+#pragma warning restore IDE0090
+        return color;
+
     }
 
     public override void Write(Utf8JsonWriter writer, Color value, JsonSerializerOptions options)
     {
-        string str = "#" + value.R.ToString("X2") + value.G.ToString("X2") + value.B.ToString("X2");
-        writer.WriteStringValue(str);
+        writer.WriteStringValue($"#{value.R:X2}{value.G:X2}{value.B:X2}");
     }
 }
 
@@ -50,7 +54,7 @@ internal class RectConverter : JsonConverter<Rect>
             throw new JsonException();
         }
 
-        List<int> value = new List<int>();
+        List<int> value = new();
 
         while (reader.Read())
         {
@@ -91,7 +95,7 @@ internal class Vector2Converter : JsonConverter<Vector2>
             throw new JsonException();
         }
 
-        List<float> value = new List<float>();
+        List<float> value = new();
 
         while (reader.Read())
         {
@@ -115,8 +119,9 @@ internal class Vector2Converter : JsonConverter<Vector2>
     public override void Write(Utf8JsonWriter writer, Vector2 val, JsonSerializerOptions options)
     {
         writer.WriteStartArray();
-        writer.WriteNumberValue(val.X);
-        writer.WriteNumberValue(val.Y);
+        (float x, float y) = val;
+        writer.WriteNumberValue(x);
+        writer.WriteNumberValue(y);
         writer.WriteEndArray();
     }
 }
@@ -130,7 +135,7 @@ internal class PointConverter : JsonConverter<Point>
             throw new JsonException();
         }
 
-        List<int> value = new List<int>();
+        List<int> value = new();
 
         while (reader.Read())
         {
@@ -199,5 +204,30 @@ internal class CxCyConverter : JsonConverter<Point>
         writer.WriteNumberValue(val.X);
         writer.WriteNumberValue(val.Y);
         writer.WriteEndArray();
+    }
+}
+
+internal class NeighborDirConverter : JsonConverter<NeighborDir>
+{
+    public override NeighborDir Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "n" => NeighborDir.North,
+            "s" => NeighborDir.South,
+            "e" => NeighborDir.East,
+            "w" => NeighborDir.West,
+            _ => throw new ArgumentOutOfRangeException()
+        };
+
+    public override void Write(Utf8JsonWriter writer, NeighborDir value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value switch
+        {
+            NeighborDir.North => "n",
+            NeighborDir.South => "s",
+            NeighborDir.East => "e",
+            NeighborDir.West => "w",
+            _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
+        });
     }
 }

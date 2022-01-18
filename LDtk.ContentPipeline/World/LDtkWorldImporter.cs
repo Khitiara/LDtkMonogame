@@ -11,9 +11,6 @@ public class LDtkWorldImporter : ContentImporter<string>
     {
         try
         {
-            ContentLogger.Logger = context.Logger;
-            ContentLogger.LogMessage($"Importing '{filename}'");
-
             return File.ReadAllText(Path.GetFullPath(filename));
         }
         catch (Exception e)

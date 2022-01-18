@@ -5,8 +5,12 @@ namespace LDtk.Codegen.CompilationUnits;
 
 public class ClassCompilationUnit : CompilationUnitFragment
 {
-    public string BaseClass { get; set; }
-    public List<CompilationUnitField> Fields { get; set; } = new List<CompilationUnitField>();
+    public ClassCompilationUnit(string name, List<CompilationUnitField> fields) : base(name){
+        Fields = fields;
+    }
+
+    public string? BaseClass { get; set; }
+    public List<CompilationUnitField> Fields { get; }
 
     public override void Render(CompilationUnitSource source)
     {

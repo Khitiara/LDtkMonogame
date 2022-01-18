@@ -20,10 +20,11 @@ public class LDtkRenderer
     /// The spritebatch used for rendering with this Renderer
     /// </summary>
     public SpriteBatch SpriteBatch { get; set; }
-    private static Texture2D pixel;
-    private readonly Dictionary<string, RenderedLevel> prerenderedLevels = new Dictionary<string, RenderedLevel>();
-    private readonly GraphicsDevice graphicsDevice;
-    private readonly ContentManager content;
+
+    private static   Texture2D?                        pixel;
+    private readonly Dictionary<string, RenderedLevel> prerenderedLevels = new();
+    private readonly GraphicsDevice                    graphicsDevice;
+    private readonly ContentManager?                   content;
 
     /// <summary>
     /// This is used to intizialize the renderer for use with direct file loading
@@ -34,11 +35,13 @@ public class LDtkRenderer
         SpriteBatch = spriteBatch;
         graphicsDevice = spriteBatch.GraphicsDevice;
 
-        if (pixel == null)
+        if (pixel != null)
         {
-            pixel = new Texture2D(graphicsDevice, 1, 1);
-            pixel.SetData(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF });
+            return;
         }
+
+        pixel = new Texture2D(graphicsDevice, 1, 1);
+        pixel.SetData(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF });
     }
 
     /// <summary>
@@ -61,16 +64,12 @@ public class LDtkRenderer
     public void PrerenderLevel(LDtkLevel level)
     {
         if (prerenderedLevels.ContainsKey(level.Identifier))
-        {
             return;
-        }
 
-        RenderedLevel renderLevel = new RenderedLevel();
+        RenderedLevel renderLevel = new();
 
         SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
-        {
-            renderLevel.layers = RenderLayers(level);
-        }
+        renderLevel.layers = RenderLayers(level);
 
         SpriteBatch.End();
 
@@ -78,16 +77,21 @@ public class LDtkRenderer
         graphicsDevice.SetRenderTarget(null);
     }
 
-    private Texture2D[] RenderLayers(LDtkLevel level)
-    {
-        List<Texture2D> layers = new List<Texture2D>();
+    private Texture2D[] RenderLayers(LDtkLevel level) => RenderLayersImpl(level).ToArray();
 
+    private IEnumerable<Texture2D> RenderLayersImpl(LDtkLevel level)
+    {
         if (level.BgRelPath != null)
         {
-            layers.Add(RenderBackgroundToLayer(level));
+            yield return RenderBackgroundToLayer(level);
         }
 
         // Render Tile, Auto and Int grid layers
+        if (level.LayerInstances == null)
+        {
+            yield break;
+        }
+
         for (int i = level.LayerInstances.Length - 1; i >= 0; i--)
         {
             LayerInstance layer = level.LayerInstances[i];
@@ -106,17 +110,18 @@ public class LDtkRenderer
 
             int width = layer._CWid * layer._GridSize;
             int height = layer._CHei * layer._GridSize;
-            RenderTarget2D renderTarget = new(graphicsDevice, width, height, false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            RenderTarget2D renderTarget = new(graphicsDevice, width, height, false, SurfaceFormat.Color,
+                DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
 
             graphicsDevice.SetRenderTarget(renderTarget);
-            layers.Add(renderTarget);
 
             switch (layer._Type)
             {
                 case LayerType.Tiles:
-                    foreach (TileInstance tile in layer.GridTiles.Where(tile => layer._TilesetDefUid.HasValue))
+                    foreach (TileInstance tile in layer.GridTiles!.Where(_ => layer._TilesetDefUid.HasValue))
                     {
-                        Vector2 position = new(tile.Px.X + layer._PxTotalOffsetX, tile.Px.Y + layer._PxTotalOffsetY);
+                        Vector2 position = new(tile.Px.X + layer._PxTotalOffsetX,
+                            tile.Px.Y + layer._PxTotalOffsetY);
                         Rectangle rect = new(tile.Src.X, tile.Src.Y, layer._GridSize, layer._GridSize);
                         SpriteEffects mirror = (SpriteEffects)tile.F;
                         SpriteBatch.Draw(texture, position, rect, Color.White, 0, Vector2.Zero, 1f, mirror, 0);
@@ -126,11 +131,12 @@ public class LDtkRenderer
 
                 case LayerType.AutoLayer:
                 case LayerType.IntGrid:
-                    if (layer.AutoLayerTiles.Length > 0)
+                    if (layer.AutoLayerTiles?.Length > 0 && layer._TilesetDefUid.HasValue)
                     {
-                        foreach (TileInstance tile in layer.AutoLayerTiles.Where(tile => layer._TilesetDefUid.HasValue))
+                        foreach (TileInstance tile in layer.AutoLayerTiles)
                         {
-                            Vector2 position = new(tile.Px.X + layer._PxTotalOffsetX, tile.Px.Y + layer._PxTotalOffsetY);
+                            Vector2 position = new(tile.Px.X + layer._PxTotalOffsetX,
+                                tile.Px.Y + layer._PxTotalOffsetY);
                             Rectangle rect = new(tile.Src.X, tile.Src.Y, layer._GridSize, layer._GridSize);
                             SpriteEffects mirror = (SpriteEffects)tile.F;
                             SpriteBatch.Draw(texture, position, rect, Color.White, 0, Vector2.Zero, 1f, mirror, 0);
@@ -141,22 +147,23 @@ public class LDtkRenderer
                 case LayerType.Entities:
                     break;
                 default:
-                    break;
+                    throw new ArgumentOutOfRangeException();
             }
-        }
 
-        return layers.ToArray();
+            yield return renderTarget;
+        }
     }
 
     private Texture2D RenderBackgroundToLayer(LDtkLevel level)
     {
-        Texture2D texture = GetTexture(level, level.BgRelPath);
+        Texture2D texture = GetTexture(level, level.BgRelPath!);
 
-        RenderTarget2D layer = new(graphicsDevice, level.PxWid, level.PxHei, false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+        RenderTarget2D layer = new(graphicsDevice, level.PxWid, level.PxHei, false, SurfaceFormat.Color,
+            DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
 
         graphicsDevice.SetRenderTarget(layer);
         {
-            LevelBackgroundPosition bg = level._BgPos;
+            LevelBackgroundPosition bg = level._BgPos!;
             Vector2 pos = bg.TopLeftPx.ToVector2();
             SpriteBatch.Draw(texture, pos, bg.CropRect, Color.White, 0, Vector2.Zero, bg.Scale, SpriteEffects.None, 0);
         }
@@ -166,18 +173,9 @@ public class LDtkRenderer
         return layer;
     }
 
-    private Texture2D GetTexture(LDtkLevel level, string path)
-    {
-        if (content == null)
-        {
-            return Texture2D.FromFile(graphicsDevice, Path.Combine(level.Parent.RootFolder, path));
-        }
-        else
-        {
-            string file = Path.ChangeExtension(path, null);
-            return content.Load<Texture2D>(file);
-        }
-    }
+    private Texture2D GetTexture(LDtkLevel level, string path) => content == null
+        ? Texture2D.FromFile(graphicsDevice, Path.Combine(level.Parent.RootFolder, path))
+        : content.Load<Texture2D>(Path.ChangeExtension(path, null));
 
     /// <summary>
     /// Render the prerendered level you created from PrerenderLevel()
@@ -187,9 +185,8 @@ public class LDtkRenderer
     {
         if (prerenderedLevels.TryGetValue(level.Identifier, out RenderedLevel prerenderedLevel))
         {
-            for (int i = 0; i < prerenderedLevel.layers.Length; i++)
-            {
-                SpriteBatch.Draw(prerenderedLevel.layers[i], level.Position.ToVector2(), Color.White);
+            foreach (Texture2D t in prerenderedLevel.layers) {
+                SpriteBatch.Draw(t, level.Position.ToVector2(), Color.White);
             }
         }
         else
@@ -206,9 +203,8 @@ public class LDtkRenderer
     {
         Texture2D[] layers = RenderLayers(level);
 
-        for (int i = 0; i < layers.Length; i++)
-        {
-            SpriteBatch.Draw(layers[i], level.Position.ToVector2(), Color.White);
+        foreach (Texture2D t in layers) {
+            SpriteBatch.Draw(t, level.Position.ToVector2(), Color.White);
         }
     }
 
@@ -224,14 +220,17 @@ public class LDtkRenderer
             {
                 int cellValue = intGrid.Values[x, y];
 
-                if (cellValue != 0)
+                if (cellValue == 0)
                 {
-                    Color col = intGrid.GetColorFromValue(cellValue);
-
-                    int spriteX = intGrid.WorldPosition.X + (x * intGrid.TileSize);
-                    int spriteY = intGrid.WorldPosition.Y + (y * intGrid.TileSize);
-                    SpriteBatch.Draw(pixel, new Vector2(spriteX, spriteY), null, col, 0, Vector2.Zero, new Vector2(intGrid.TileSize), SpriteEffects.None, 0);
+                    continue;
                 }
+
+                Color col = intGrid.GetColorFromValue(cellValue);
+
+                int spriteX = intGrid.WorldPosition.X + (x * intGrid.TileSize);
+                int spriteY = intGrid.WorldPosition.Y + (y * intGrid.TileSize);
+                SpriteBatch.Draw(pixel, new Vector2(spriteX, spriteY), null, col, 0, Vector2.Zero,
+                    new Vector2(intGrid.TileSize), SpriteEffects.None, 0);
             }
         }
     }
@@ -245,9 +244,11 @@ public class LDtkRenderer
     /// </summary>
     /// <param name="entity">The entity you want to render</param>
     /// <param name="texture">The spritesheet/texture for rendering the entity</param>
-    public void RenderEntity<T>(T entity, Texture2D texture) where T : ILDtkEntity
+    public void RenderEntity<T>(T entity, Texture2D texture)
+        where T : ILDtkEntity
     {
-        SpriteBatch.Draw(texture, entity.Position, entity.Tile, Color.White, 0, entity.Pivot * entity.Size, 1, SpriteEffects.None, 0);
+        SpriteBatch.Draw(texture, entity.Position, entity.Tile, Color.White, 0, entity.Pivot * entity.Size, 1,
+            SpriteEffects.None, 0);
     }
 
     /// <summary>
@@ -256,9 +257,11 @@ public class LDtkRenderer
     /// <param name="entity">The entity you want to render</param>
     /// <param name="texture">The spritesheet/texture for rendering the entity</param>
     /// <param name="flipDirection">The direction to flip the entity when rendering</param>
-    public void RenderEntity<T>(T entity, Texture2D texture, SpriteEffects flipDirection) where T : ILDtkEntity
+    public void RenderEntity<T>(T entity, Texture2D texture, SpriteEffects flipDirection)
+        where T : ILDtkEntity
     {
-        SpriteBatch.Draw(texture, entity.Position, entity.Tile, Color.White, 0, entity.Pivot * entity.Size, 1, flipDirection, 0);
+        SpriteBatch.Draw(texture, entity.Position, entity.Tile, Color.White, 0, entity.Pivot * entity.Size, 1,
+            flipDirection, 0);
     }
 
     /// <summary>
@@ -267,11 +270,13 @@ public class LDtkRenderer
     /// <param name="entity">The entity you want to render</param>
     /// <param name="texture">The spritesheet/texture for rendering the entity</param>
     /// <param name="animationFrame">The current frame of animation. Is a very basic entity animation frames must be to the right of them and be the same size</param>
-    public void RenderEntity<T>(T entity, Texture2D texture, int animationFrame) where T : ILDtkEntity
+    public void RenderEntity<T>(T entity, Texture2D texture, int animationFrame)
+        where T : ILDtkEntity
     {
         Rectangle animatedTile = entity.Tile;
         animatedTile.Offset(animatedTile.Width * animationFrame, 0);
-        SpriteBatch.Draw(texture, entity.Position, animatedTile, Color.White, 0, entity.Pivot * entity.Size, 1, SpriteEffects.None, 0);
+        SpriteBatch.Draw(texture, entity.Position, animatedTile, Color.White, 0, entity.Pivot * entity.Size, 1,
+            SpriteEffects.None, 0);
     }
 
     /// <summary>
@@ -281,11 +286,13 @@ public class LDtkRenderer
     /// <param name="texture">The spritesheet/texture for rendering the entity</param>
     /// <param name="flipDirection">The direction to flip the entity when rendering</param>
     /// <param name="animationFrame">The current frame of animation. Is a very basic entity animation frames must be to the right of them and be the same size</param>
-    public void RenderEntity<T>(T entity, Texture2D texture, SpriteEffects flipDirection, int animationFrame) where T : ILDtkEntity
+    public void RenderEntity<T>(T entity, Texture2D texture, SpriteEffects flipDirection, int animationFrame)
+        where T : ILDtkEntity
     {
         Rectangle animatedTile = entity.Tile;
         animatedTile.Offset(animatedTile.Width * animationFrame, 0);
-        SpriteBatch.Draw(texture, entity.Position, animatedTile, Color.White, 0, entity.Pivot * entity.Size, 1, flipDirection, 0);
+        SpriteBatch.Draw(texture, entity.Position, animatedTile, Color.White, 0, entity.Pivot * entity.Size, 1,
+            flipDirection, 0);
     }
 
     #endregion
