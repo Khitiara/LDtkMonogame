@@ -31,10 +31,6 @@
 
     <ItemGroup>
         <None Include="../Icon.png" Pack="true" PackagePath="" />
-        <Content Include="bin/Release/netcoreapp3.1/LDtk.dll">
-            <PackagePath>lib/netcoreapp3.1/</PackagePath>
-            <Pack>true</Pack>
-        </Content>
     </ItemGroup>
 
 </Project>

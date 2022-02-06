@@ -23,7 +23,7 @@ public class ClassCompilationUnit : CompilationUnitFragment
         source.AddLine($"using LDtk;");
         source.AddLine($"using Microsoft.Xna.Framework;");
         source.AddLine("");
-        source.AddLine($"public class {Name}{extends}");
+        source.AddLine($"public partial class {Name}{extends}");
         source.StartBlock();
 
         foreach (CompilationUnitField field in Fields)
