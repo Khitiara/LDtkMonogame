@@ -3,10 +3,7 @@
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Color = Microsoft.Xna.Framework.Color;
-using Point = Microsoft.Xna.Framework.Point;
-using Rectangle = Microsoft.Xna.Framework.Rectangle;
-using Vector2 = Microsoft.Xna.Framework.Vector2;
+using Microsoft.Xna.Framework;
 
 #pragma warning disable 1591, 1570, IDE1006, CS8618
 namespace LDtk;
@@ -75,15 +72,15 @@ public partial class LDtkWorld
 
     public static readonly JsonSerializerOptions SerializeOptions = new()
     {
-        Converters ={
+        Converters =
+        {
             new NeighborDirConverter(),
-                new JsonStringEnumConverter(),
-                new ColorConverter(),
-                new RectConverter(),
-                new Vector2Converter(),
-                new PointConverter(),
-            },
-        
+            new JsonStringEnumConverter(),
+            new ColorConverter(),
+            new RectConverter(),
+            new Vector2Converter(),
+            new PointConverter(),
+        },
     };
 }
 
